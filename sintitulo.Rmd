@@ -1,0 +1,483 @@
+---
+title: "Proyecto final - Mercados financieros"
+date: "05/26/2023"
+author:
+- Vargas Hernández Alessandra - 319008717
+- Fuentes Soriano Adrián - 422130606
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+# Problema 2
+
+Para este ejercicio se eligieron diez acciones que cotizan en la NYSE, a decir:
+
+* Tesla (TSLA NYSE)
+* Vale S.A. (VALE NYSE)
+* Intel (INTC NYSE)
+* Apple (AAPL NYSE)
+* Catalent Inc. (CTLT NYSE)
+* Citigroup (C NYSE) 
+* VF Corporation (VFC NYSE)
+* Chevron Corp. (CVX NYSE)
+* Bank of America Corp. (BAC NYSE) 
+* Uber (UBER NYSE)
+
+
+El cálculo de los retornos se hace a continuación.
+Primero cargamos la librería quantmod.
+
+```{r, datos_1a}
+library(quantmod)
+```
+Una vez descargada, cargamos la información del precio de cierre de las acciones a un data frame.
+```{r, datos_1b}
+tickers <- c("TSLA", "VALE", "INTC", "AAPL", "CTLT", "C", "VFC", "CVX", "BAC" ,"UBER")
+getSymbols(tickers, src = "yahoo", from = "2022-05-17", to = "2023-05-16")
+prices <- c()
+
+for (i in 1:length(tickers)) {
+  prices[[tickers[i]]] <- Ad(get(tickers[i]))
+}
+
+precios <- data.frame(prices)
+colnames(precios) <- tickers
+```
+
+Para crear el data frame de los log-retornos diarios, creamos una matriz vacía y a continuación iteramos sobre cada valor para hacer el cálculo de cada uno.
+
+```{r, datos_1c}
+lr <- matrix(0 , dim(precios)[1], length(tickers))
+
+for (j in 1:length(tickers)){
+  for(i in 2:dim(precios)[1]){
+    lr[i,j] <- (log(precios[i,j]/precios[i-1,j]))
+  }
+}
+
+```
+
+Entonces convertimos la matriz de log-retornos a un data frame, indicando el nombre de las columnas y las fechas de cada uno de los retornos.
+
+```{r, datos_1d}
+lr <- data.frame(lr)
+
+colnames(lr) <- colnames(precios)
+
+rownames(lr) <- rownames(precios)
+
+
+```
+
+El problema además solicita el riesgo asociado a cada acción, lo cual puede calcularse como la volatilidad muestral de los log-retornos de cada acción. Primero debe de calcularse la varianza de los retornos, esto se logra con la función descrita a continuación:
+
+
+```{r, datos_1e}
+
+var = function(retornos){
+  vars=sum((retornos-mean(retornos))^2)/(length(retornos)-1)
+  return(vars)
+}
+
+```
+
+Haciendo uso de esto, calculamos la varianza de los retornos de cada acción.
+```{r, datos_1f}
+#Se crea un vector vacío de varianzas
+varianzas <- c()
+
+#Cálculo de la varianza muestral del retorno diario por acción
+for(i in 1:length(tickers)){
+  varianzas[i] <- var(lr[ ,i])
+}
+
+#Guardamos las varianzas como data frame
+varianzas <- data.frame(varianzas)
+rownames(varianzas) <- colnames(precios)
+```
+
+Entonces podemos ver la varianza de cada acción
+
+```{r, var}
+varianzas
+```
+
+La volatilidad se calcula como la raíz cuadrada de la varianza y se expresa en puntos porcentuales, entonces:
+
+```{r, volatilidad}
+volatilidad <- sqrt(varianzas)*100
+colnames(volatilidad) <- "Volatilidad"
+volatilidad
+```
+
+
+El problema además solicita una matriz de covarianzas y varianzas. Creamos primero una matriz vacía y luego una función que calcula la covarianza entre cualesquiera dos acciones. Aplicamos la fórmula $Cov(X,Y)=\frac{1}{n-1} \sum_{i=1}^{n}(x_i-\bar{x})(y_i-\bar{y})$
+, de donde $\bar{x}=\sum_{i=1}^{n} \frac{x_i}{n}$ y $\bar{y}=\sum_{i=1}^{n} \frac{y_i}{n}$.
+
+```{r, varianzas_a}
+#Creación de una matriz vacía de covarianzas y varianzas
+mat_covarianzas <- matrix(NA, length(tickers), length(tickers))
+
+#Esta función calcula la covarianza entre dos acciones
+covar = function(retorno1, retorno2){
+  mean1 = mean(retorno1)
+  mean2 = mean(retorno2)
+  cov1_2 = sum((retorno1-mean1)*(retorno2-mean2))/(length(retorno1)-1)
+  return(cov1_2)
+} 
+
+#Aquí se calcula la matriz de covarianzas entre las acciones seleccionadas
+for (i in 1:length(tickers)){
+  for (j in 1:length(tickers)){
+    mat_covarianzas[i,j] <- covar(lr[ ,i],lr[ ,j])
+  }
+}
+```
+
+Dicha matriz de covarianzas se convertirá a un data frame para ser visualizado de una forma accesible.
+
+```{r, matcov}
+mat_covarianzas <- as.data.frame(mat_covarianzas)
+colnames(mat_covarianzas) <- tickers
+rownames(mat_covarianzas) <- tickers
+```
+\newpage A contunuación se muestra la matriz de covarianzas y varianzas: 
+
+```{r, matriz}
+mat_covarianzas
+```
+
+
+Para el análisis de este problema puede ser útil calcular el promedio de los log-rendimientos de cada acción:
+
+```{r, rendimientos}
+ren_promedio <- c()
+for (i in 1:length(tickers)){
+  ren_promedio[i] <- mean(lr[ ,i])
+}
+
+
+ren_promedio <- as.data.frame(ren_promedio)
+rownames(ren_promedio) <- tickers
+colnames(ren_promedio) <- "Rendimiento promedio"
+
+ren_promedio
+```
+
+También analizamos la volatilidad para la priorización de las acciones 
+```{r, printvolatilidad}
+analisis <- data.frame(volatilidad,ren_promedio)
+```
+
+La empresa en la cual conviene invertir más es Apple, pues ha tenido rendimientos positivos a pesar de tener una volatilidad moderada.
+
+La siguiente empresa  es Uber, pues a pesar de tener un rendimiento mayor al de Apple, el aumento en la volatilidad con respecto a Apple es considerable.
+
+La tercera empresa es Chevron Group, pues tiene una rentabilidad ligeramente por debajo del cero, y de las diez acciones es la de menor volatilidad
+
+La cuarta empresa es Citigroup, pues el rendimiento que tiene es apenas menor que la anterior acción, sin embargo, describe un aumento considerable en la volatilidad.
+
+La quinta empresa es Vale S.A. pues tiene un rendimiento ligeramente menor que la anterior acción, sin embargo, la volatilidad es considerablemente mayor.
+
+La sexta empresa es Bank of America, debido a que tiene rendimientos aún más negativos y la volatilidad es muy similar a la que tiene  Chevron.
+
+La séptima empresa es Intel. Sus rendimientos son más negativos con una volatilidad superior al 2%.
+
+La octava empresa es VF corp. pues, tiene rendimientos aún más negativos que Intel con una volatilidad similar.
+
+La novena empresa es Tesla, ya que sus rendimientos son similares a los de Intel, sin embargo, tienen una volatilidad de casi el doble que esta.
+
+La última empresa es Catalent Inc. pues tiene los rendimientos más negativos y la volatilidad más alta.
+
+Entonces podemos ordenarlas de la siguiente forma:
+
+1. Apple
+2. Uber
+3. Chevron group
+4. Citigroup
+5. Vale S.A.
+6. Bank of America
+7. Intel
+8. VF corp.
+9. Tesla
+10. Catalent Inc.
+
+A continuación se da una explicación acerca del quehacer de cada empresa.
+
+
+## Apple 
+Apple, Inc. es una empresa tecnológica estadounidense que diseña y produce equipos electrónicos, software y servicios en línea.
+
+## Uber
+Uber es una empresa estadounidense proveedora de movilidad como un servicio. Tiene su sede en San Francisco y opera en más de 900 áreas metropolitanas de todo el mundo.
+
+## Chevron group
+Chevron Corporation es una empresa petrolera estadounidense constituida en 1911 en California. Dispone de importantes yacimientos petrolíferos y de gas natural, refinerías de petróleo y buques petroleros. 
+
+## Citigroup
+Es la mayor empresa de servicios financieros del mundo con sede en Nueva York y la primera compañía estadounidense que pudo combinar seguros y banca tras la Gran Depresión de 1929.
+
+## Vale S.A.
+Es una empresa multinacional brasileña fundada en 1942 y con sede en la ciudad de Río de Janeiro, la empresa opera en los sectores de minería, logística, energía siderúrgica y petróleo, y es uno de los mayores operadores logísticos de Brasil.
+
+## Bank of America 
+Es una empresa estadounidense de tipo bancario y de servicios financieros multinacional con sede central en Charlotte, Carolina del Norte. Es el segundo mayor holding bancario en los Estados Unidos por activos.
+
+## Intel 
+Empresa tecnológica más grande en dedicarse a la manufactura de circuitos integrados. Dicha compañía fabrica los procesadores más comúnmente encontrados en la mayoría de las computadoras personales. 
+
+## VF corp.
+VF Corporation es una empresa global estadounidense de indumentaria y calzado.
+
+## Tesla
+Es una empresa estadounidense con sede en Austin, Texas. Diseña, fabrica y vende automóviles eléctricos, componentes para la propulsión de vehículos eléctricos, techos solares, instalaciones solares fotovoltaicas y baterías domésticas.
+
+## Catalent inc. 
+Es una empresa multinacional con sede en Somerset, Nueva Jersey. Es un proveedor global de tecnologías de entrega, desarrollo, fabricación de medicamentos, productos biológicos, terapias génicas y productos de salud para el consumidor.\newpage
+
+
+## Análisis de varianzas y covarianzas.
+
+A continuación se muestra dicha matriz.
+
+```{r, matrizcov}
+mat_covarianzas
+```
+
+### Observaciones:
+Se puede notar cómo es que las empresas que se dedican a un mismo sector, tienen una covarianza más alta, como es el caso de Citigroup y Bank of América, pues ambas se dedican al sector financiero y la covarianza que describen es mayor que la que describen con cualquier otra empresa.
+
+El caso es el mismo para Tesla, Apple e Intel que tienen una covarianza alta, esto puede explicarse debido a que las tres empresas corresponden al sector tecnológico.
+
+De la misma forma sucede para Vale y Catalent, pues se dedican al sector energético. 
+
+
+Otra observación importante es que en general Citigroup tiene una correlación importante con todas las demás empresas. Esto podría explicarse debido a que dicha empresa posee servicios financieros amplios, es posible que una gran parte de las empresas listadas tengan algún tipo de relación comercial con dicha empresa.
+
+Finalmente se puede observar que las acciones de Apple y Vale tienen las covarianzas más bajas con otras acciones. El caso de Vale puede explicarse debido a que esta es una empresa extranjera que cotiza en NYSE, sin embargo el caso de Apple tiene una explicación desconocida.
+\newpage
+
+# Problema 3
+
+Primero calcularemos el rendimiento de cada una de las acciones elegidas
+
+```{r, rendimientosp3}
+
+#Guardamos los tickers de cada acción
+tickers1 <- c("AAPL","UBER", "CVX", "C", "VALE")
+
+lr_aux <- c()
+#Seleccionamos los log retornos de las empresas
+
+for (i in tickers1) {
+  lr_aux <- cbind(lr_aux, lr[[i]])
+}
+
+ 
+lr_aux <- as.data.frame(lr_aux)
+colnames(lr_aux) <- tickers1
+rownames(lr_aux) <- rownames(precios)
+
+
+#Calculamos los rendimientos promedio de las mejores 5 empresas
+ren_promedio3 <- c()
+for (i in 1:length(tickers1)){
+  ren_promedio3[i] <- mean(lr_aux[ ,i])
+}
+
+
+#Guardamos los rendimientos en un dataframe
+ren_promedio3 <- as.data.frame(ren_promedio3)
+rownames(ren_promedio3) <-  tickers1
+
+#Convertimos los log-retornos a retornos.
+rend_aux <- exp(ren_promedio3)
+rend_aux <- rend_aux[['ren_promedio3']]
+```
+
+
+Ahora construimos la matriz de covarianzas para los 5 activos.
+
+```{r, covarianzas3}
+
+mat_covarianzas1 <- matrix(NA, length(tickers1), length(tickers1))
+
+
+#Calculamos la matriz de covarianzas para las acciones elegidas.
+for (i in 1:length(tickers1)){
+  for (j in 1:length(tickers1)){
+    mat_covarianzas1[i,j] <- covar(lr_aux[ ,i],lr_aux[ ,j])
+  }
+}
+
+colnames(mat_covarianzas1) <- tickers1
+rownames(mat_covarianzas1) <- tickers1
+
+
+```
+
+\newpage
+
+A continuación se muestra la matriz de covarianzas para los 5 activos.
+```{r, imprimecovar}
+mat_covarianzas1
+```
+
+Ahora fabricamos una función que calcula el riesgo de un portafolios.
+
+```{r, mediavar}
+#Esta función calcula el riesgo del portafolios dada la 
+#matriz de covarianzas, los rendimientos y el retorno esperado.
+
+riesgos=function(VarCov, rendimientos, r_esperado){
+  ones=rep(1, nrow(VarCov))
+  zeros=rep(0, nrow(VarCov))
+  AA=cbind (VarCov, -ones, -rendimientos)
+  length(c(ones,0,0))
+  length(c(rendimientos,0,0))
+  AA= rbind (AA, c(ones,0,0), c(rendimientos,0,0))
+  AA_inv=solve(AA)
+  W=AA_inv %*% c(zeros, 1, r_esperado)
+  W=W[1:nrow(VarCov)]
+  sum(W)
+  Riesgo=(t(W) %*% VarCov %*% W)^0.5
+  
+  return(Riesgo)
+}
+
+
+```
+
+
+
+### Diagrama de media-varianza.
+Ahora graficamos la frontera de media-varianza, entonces 
+$\sigma^2=\sum_{i,j=1}^n w_i w_j \sigma_{i,j}$
+
+Sean $W_a=(a_1, a_2)$, $W_b=(b_1,b_2)$ y $\Sigma=\sigma_{i,j}$ con $i,j \in \{1,2\}$.
+$W' \cdot \Sigma \cdot W$
+$(a_1 \sigma_{1,1} +a_1  \sigma_{2,1},a_3 \sigma_{1,2} +a_2  \sigma_{2,2} )$
+$(a_1 \sigma_{1,1} a_1 +a_1  \sigma_{2,1} a_2+a_2 \sigma_{1,2} a_1 +a_2  \sigma_{2,2} a_2 )$.
+
+
+```{r, mediavar1}
+#Generamos un vector de rendimientos y calculamos su riesgo asociado.
+s=0.001
+rend=seq(from=1-s, to=1+s, by=0.00001)
+
+riesgo=numeric(length(rend))
+
+#Calcula el riesgo de cada rendimiento en el vector
+for (i in 1:length(rend)){
+  riesgo[i]=riesgos(mat_covarianzas1, rend_aux, rend[i])
+}
+
+#Generamos 15 puntos aleatorios de la frontera eficiente.
+puntos <- runif(15, min=1-s, max=1+s) 
+
+riesgo_punto <- c()
+#Calculamos el riesgo asociado a cada punto y guardamos en un vector.
+for (i in 1:length(puntos)){
+  riesgo_punto[i]=riesgos(mat_covarianzas1, rend_aux, puntos[i])
+}
+
+
+```
+
+Ahora generamos el gráfico de media varianza con los 15 puntos en la frontera eficiente.
+```{r, grafico}
+
+plot(riesgo, rend, type = "l", ann = FALSE)
+
+for (i in 1:length(puntos)) {
+  points(riesgo_punto[i], puntos[i] , type = "o", col="#19535F", pch=17, cex=1)
+}
+
+legend(x = "topright", legend = c("Conjunto factible", "Puntos de la frontera"), lty = c(1, NA), pch = c(NA, 17), col = c("#000000", "#19535F"), lwd = 2)   
+
+title(main = "Gráfica de frontera media-varianza.",
+      xlab = "Riesgo",
+      ylab = "Rendimiento")
+
+
+
+```
+
+Ahora buscamos el portafolio de mínima varianza global, el cual tiene un riesgo
+```{r, minimavar}
+  riesgo[which.min(riesgo)]
+```
+
+Y un rendimiento de 
+
+```{r, minimrend}
+  rend[which.min(riesgo)]
+```
+
+
+Calculamos los pesos del PVMG:
+
+```{r, auxiliar}
+
+#Esta función calcula los pesos de un portafolios con un rendimiento esperado dado.
+weight=function(VarCov, rendimientos, r_esperado){
+  ones=rep(1, nrow(VarCov))
+  zeros=rep(0, nrow(VarCov))
+  AA=cbind (VarCov, -ones, -rendimientos)
+  length(c(ones,0,0))
+  length(c(rendimientos,0,0))
+  AA= rbind (AA, c(ones,0,0), c(rendimientos,0,0))
+  AA_inv=solve(AA)
+  W=AA_inv %*% c(zeros, 1, r_esperado)
+  W=W[1:nrow(VarCov)]
+  return(W)
+}
+
+#El retorno esperado será 
+r <- rend[which.min(riesgo)]
+
+
+pesos <- weight(mat_covarianzas1, rend_aux, r)
+pesos <- as.data.frame(pesos)
+rownames(pesos) <- tickers1
+
+```
+
+Entonces los pesos del PVMG se muestran a continuación:
+
+```{r, imprimepesos}
+  pesos
+
+```
+Al agregar el PVMG al gráfico de media varianza se observa lo siguiente:
+
+```{r, graficofinal}
+
+plot(riesgo, rend, type = "l", ann = FALSE)
+
+for (i in 1:length(puntos)) {
+  points(riesgo_punto[i], puntos[i] , type = "o", col="#19535F", pch=8, cex=1)
+}
+
+points(riesgo[which.min(riesgo)], rend[which.min(riesgo)] , type = "o", col="#19535F", pch=17, cex=1.5)
+
+
+legend(x = "topright", legend = c("Conjunto factible", "PVMG"), lty = c(1, NA), pch = c(NA, 17), col = c("#000000", "#19535F"), lwd = 2)   
+
+title(main = "Gráfica de frontera media-varianza.",
+      xlab = "Riesgo",
+      ylab = "Rendimiento")
+
+
+
+```
+
+
+
+
+
